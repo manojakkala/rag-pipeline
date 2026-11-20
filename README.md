@@ -1,13 +1,3 @@
----
-title: RAG Assistant
-emoji: 🔎
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # 🔎 RAG Assistant — Documentation & Live-API Assistant
 
 A **production-grade Retrieval-Augmented Generation (RAG)** system, built stage by stage.
@@ -53,7 +43,9 @@ Groq (gpt-oss-120b / 20b) · MCP · Docker · GitHub Actions**
 5. Start the web app: `python app/server.py` → open http://localhost:5000
 
 ## ☁️ Deploy
-See **[DEPLOY.md](DEPLOY.md)** for step-by-step Hugging Face Spaces deployment (Docker).
+Dockerized — runs on any container host (Render, Google Cloud Run, Fly.io, a VM). Set `DATABASE_URL` and
+`GROQ_API_KEY` as environment variables; the container listens on `$PORT`. On a 512MB host, set
+`LITE_RETRIEVAL=1` to skip the reranker model and fit in memory.
 
 ## 📚 More
 - **[PROJECT.md](PROJECT.md)** — the full build log: plan, decisions, metrics, coverage checklist.

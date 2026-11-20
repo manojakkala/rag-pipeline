@@ -31,7 +31,6 @@ COPY --chown=user . .
 
 EXPOSE 7860
 
-# Production server: ONE worker (so the models load once), several threads for concurrency,
-# a generous timeout (model + LLM calls), bound to the port HF Spaces expects.
-CMD ["gunicorn", "--workers", "1", "--threads", "4", "--timeout", "180", \
-     "--bind", "0.0.0.0:7860", "--pythonpath", "app,query", "server:app"]
+# Production server: ONE worker (models load once), a few threads, generous timeout.
+# Shell form so ${PORT} expands: Render (and most hosts) inject PORT; locally it defaults to 7860.
+CMD gunicorn --workers 1 --threads 2 --timeout 180 --bind 0.0.0.0:${PORT:-7860} --pythonpath app,query server:app

@@ -27,15 +27,21 @@ import guardrails
 
 app = Flask(__name__)
 
+# On tiny hosts (e.g. a 512MB free tier) loading BOTH models can run out of memory.
+# LITE_RETRIEVAL=1 skips the cross-encoder reranker: we still do hybrid (vector+BM25) search,
+# just without the extra rerank model — so the whole app fits in ~512MB.
+LITE = bool(os.environ.get("LITE_RETRIEVAL"))
+
 
 def _warmup():
-    """Load + warm the ML models once at startup so the FIRST real request is fast.
-    (No DB needed here — we just wake the embedder and the reranker from cold.)"""
+    """Load + warm the ML model(s) once at startup so the FIRST real request is fast.
+    (No DB needed here — we just wake the models from cold.)"""
     try:
-        list(retrieve.model.query_embed(["warm up"]))                   # wake the embedder
-        list(retrieve._get_reranker().rerank("warm up", ["warm up"]))   # wake the reranker
-        print("[startup] models warmed up", file=sys.stderr)
-    except Exception as e:                                              # never let warmup crash boot
+        list(retrieve.model.query_embed(["warm up"]))                       # wake the embedder
+        if not LITE:
+            list(retrieve._get_reranker().rerank("warm up", ["warm up"]))   # wake the reranker
+        print(f"[startup] models warmed up (lite={LITE})", file=sys.stderr)
+    except Exception as e:                                                  # never let warmup crash boot
         print("[startup] warmup skipped:", repr(e), file=sys.stderr)
 
 
@@ -71,8 +77,14 @@ def traced_ask(question: str) -> dict:
     # --- RAG path ---
     t = time.time(); rq = rewrite.rewrite_query(question); span("rewrite", t, rewritten=rq)
 
-    t = time.time(); hits = retrieve.retrieve_rerank(rq)
-    span("retrieve+rerank", t, chunks=[{"doc": h[1], "score": round(float(h[2]), 3)} for h in hits])
+    t = time.time()
+    if LITE:                                             # memory-constrained host: hybrid only
+        hits = retrieve.retrieve_hybrid_text(rq)
+        stage = "retrieve (hybrid)"
+    else:                                                # full quality: hybrid + cross-encoder rerank
+        hits = retrieve.retrieve_rerank(rq)
+        stage = "retrieve+rerank"
+    span(stage, t, chunks=[{"doc": h[1], "score": round(float(h[2]), 3)} for h in hits])
 
     blocks = [f"[{i}] (source: {h[1]})\n{h[3]}" for i, h in enumerate(hits, 1)]
     context = "\n\n".join(blocks)

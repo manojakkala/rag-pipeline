@@ -108,6 +108,21 @@ def retrieve_rerank(question: str, k: int = 5, pool: int = 50, cand: int = 30):
     return [(cid, did, float(score), text) for (cid, did, text), score in order]
 
 
+def retrieve_hybrid_text(question: str, k: int = 5, pool: int = 50):
+    """Hybrid search (vector+BM25+RRF) that ALSO returns each chunk's text — but NO reranker.
+    Used on memory-constrained hosts (e.g. a 512MB free tier) where we skip the 2nd model.
+    Returns the same 4-tuple shape as retrieve_rerank: (chunk_id, doc_id, score, text)."""
+    fused = retrieve_hybrid(question, k=k, pool=pool)          # [(chunk_id, doc_id, score), ...]
+    cids = [cid for cid, _, _ in fused]
+    if not cids:
+        return []
+    with DB.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT chunk_id, text FROM chunks WHERE chunk_id = ANY(%s)", (cids,))
+            text_of = {cid: text for cid, text in cur.fetchall()}
+    return [(cid, did, score, text_of.get(cid, "")) for cid, did, score in fused]
+
+
 def retrieve_rewrite(question: str, k: int = 5, pool: int = 50, cand: int = 30):
     """Rewrite the question into the docs' terminology first, then retrieve+rerank."""
     from rewrite import rewrite_query
