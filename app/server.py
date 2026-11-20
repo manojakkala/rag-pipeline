@@ -24,6 +24,8 @@ import retrieve
 import generate
 import github_api
 import guardrails
+import contextualize
+from sources import source_url
 
 app = Flask(__name__)
 
@@ -48,21 +50,28 @@ def _warmup():
 _warmup()
 
 
-def traced_ask(question: str) -> dict:
-    """Run the real pipeline while recording a span per step."""
+def traced_ask(question: str, history=None) -> dict:
+    """Run the real pipeline while recording a span per step.
+    `history` (recent {role, content} turns) is what makes follow-up questions work."""
     spans = []
 
     def span(stage, t0, **info):
         spans.append({"stage": stage, "ms": round((time.time() - t0) * 1000), **info})
 
-    if guardrails.looks_like_injection(question):        # input guardrail (C3)
+    if guardrails.looks_like_injection(question):        # input guardrail (C3) — on the RAW question
         return {"answer": "That looks like a prompt-injection attempt, so I won't act on it.",
                 "route": "BLOCKED", "grounded": None, "sources": [], "spans": spans}
 
-    t = time.time(); decision = router.route(question); span("route", t, decision=decision)
+    # Follow-up support: turn "what about python?" into a standalone question using the history.
+    q = question
+    if history:
+        t = time.time(); q = contextualize.contextualize(history, question)
+        span("contextualize", t, standalone=q)
+
+    t = time.time(); decision = router.route(q); span("route", t, decision=decision)
 
     if decision == "CHAT":
-        t = time.time(); ans = generate.chat_reply(question); span("chat", t)
+        t = time.time(); ans = generate.chat_reply(q); span("chat", t)
         return {"answer": ans, "route": decision, "grounded": None, "sources": [], "spans": spans}
 
     if decision == "DECLINE":
@@ -70,12 +79,12 @@ def traced_ask(question: str) -> dict:
                 "route": decision, "grounded": None, "sources": [], "spans": spans}
 
     if decision == "API":
-        t = time.time(); ans = github_api.answer_api(question); span("live_api", t)
+        t = time.time(); ans = github_api.answer_api(q); span("live_api", t)
         return {"answer": ans, "route": decision, "grounded": None,
-                "sources": ["live GitHub API"], "spans": spans}
+                "sources": [{"id": "live GitHub API", "url": None}], "spans": spans}
 
     # --- RAG path ---
-    t = time.time(); rq = rewrite.rewrite_query(question); span("rewrite", t, rewritten=rq)
+    t = time.time(); rq = rewrite.rewrite_query(q); span("rewrite", t, rewritten=rq)
 
     t = time.time()
     if LITE:                                             # memory-constrained host: hybrid only
@@ -89,11 +98,12 @@ def traced_ask(question: str) -> dict:
     blocks = [f"[{i}] (source: {h[1]})\n{h[3]}" for i, h in enumerate(hits, 1)]
     context = "\n\n".join(blocks)
 
-    t = time.time(); out, grounded, _ = generate.answer_with_check(context, question)  # shared logic
+    t = time.time(); out, grounded, _ = generate.answer_with_check(context, q)  # shared logic
     span("generate+check", t, model=generate.MODEL.split("/")[-1], grounded=grounded)
 
+    source_list = [{"id": h[1], "url": source_url(h[1])} for h in hits]   # clickable citations
     return {"answer": out, "route": decision, "grounded": grounded,
-            "sources": [h[1] for h in hits], "spans": spans}
+            "sources": source_list, "spans": spans}
 
 
 @app.route("/")
@@ -103,11 +113,13 @@ def index():
 
 @app.route("/ask", methods=["POST"])
 def ask():
-    q = (request.get_json(silent=True) or {}).get("question", "").strip()
+    payload = request.get_json(silent=True) or {}
+    q = (payload.get("question") or "").strip()
+    history = payload.get("history") or []               # recent turns for follow-up questions
     if not q:
         return jsonify({"answer": "Ask me something.", "route": "-", "grounded": None, "sources": [], "spans": []})
     try:
-        return jsonify(traced_ask(q))
+        return jsonify(traced_ask(q, history))
     except Exception as e:                                # error safety net (C2)
         print("ask error:", repr(e), file=sys.stderr)
         return jsonify({"answer": "Sorry — something went wrong (the model service may be busy or rate-limited). Please try again.",

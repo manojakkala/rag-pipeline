@@ -40,6 +40,10 @@
   .section-title { color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.5px; margin:16px 0 6px; }
   .doc { display:flex; justify-content:space-between; gap:8px; padding:4px 0; color:var(--muted); font-family:ui-monospace,monospace; font-size:12px; }
   .doc b { color:var(--text); font-weight:500; }
+  .cite { color:var(--accent); text-decoration:none; font-weight:600; }
+  .cite:hover { text-decoration:underline; }
+  .debug a { color:var(--accent); text-decoration:none; }
+  .debug a:hover { text-decoration:underline; }
   @media (max-width:760px){ .main{flex-direction:column} .chat{border-right:none;border-bottom:1px solid var(--line)} }
 </style>
 </head>
@@ -66,6 +70,7 @@ const messages = document.getElementById('messages');
 const input = document.getElementById('q');
 const send = document.getElementById('send');
 const debug = document.getElementById('debug');
+const convo = [];   // conversation history → lets follow-up questions work
 
 function addMsg(text, cls, metaHtml) {
   const d = document.createElement('div');
@@ -78,6 +83,14 @@ function addMsg(text, cls, metaHtml) {
 }
 
 function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function renderAnswer(text, sources){
+  let html = esc(text);                                   // escape untrusted model output FIRST
+  html = html.replace(/\[(\d+)\]/g, (m, n) => {           // then turn [1],[2]... into clickable links
+    const s = sources && sources[Number(n)-1];
+    return (s && s.url) ? `<a class="cite" href="${esc(s.url)}" target="_blank" rel="noopener">[${n}]</a>` : m;
+  });
+  return html;
+}
 function routeBadge(r){ const c={RAG:'b-rag',API:'b-api',CHAT:'b-rag',DECLINE:'b-decline',BLOCKED:'b-decline',error:'b-decline'}[r]||'b-rag'; return `<span class="badge ${c}">${esc(r)}</span>`; }
 
 function renderDebug(data){
@@ -94,11 +107,17 @@ function renderDebug(data){
     html += `<div class="stage"><div class="row" style="border:none;padding:2px 0"><span>${s.stage}</span><span>${s.ms} ms</span></div>
              <div class="bar" style="width:${Math.round(100*s.ms/maxMs)}%"></div></div>`;
     if (s.rewritten) html += `<div class="doc" style="margin:-4px 0 6px"><span>rewritten → ${esc(s.rewritten)}</span></div>`;
+    if (s.standalone) html += `<div class="doc" style="margin:-4px 0 6px"><span>standalone → ${esc(s.standalone)}</span></div>`;
     if (s.chunks) { for (const c of s.chunks) html += `<div class="doc"><b>${esc(c.doc)}</b><span>${esc(c.score)}</span></div>`; }
   }
   if (data.sources && data.sources.length) {
     html += `<div class="section-title">sources</div>`;
-    for (const s of data.sources) html += `<div class="doc"><b>${esc(s)}</b></div>`;
+    for (const s of data.sources) {
+      const id = esc(s && s.id ? s.id : s);
+      html += (s && s.url)
+        ? `<div class="doc"><a href="${esc(s.url)}" target="_blank" rel="noopener"><b>${id}</b></a></div>`
+        : `<div class="doc"><b>${id}</b></div>`;
+    }
   }
   debug.innerHTML = html;
 }
@@ -110,11 +129,18 @@ async function ask(){
   addMsg(q,'user');
   const thinking = addMsg('thinking…','bot'); thinking.setAttribute('role','status');
   try {
-    const res = await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    const res = await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:q, history: convo.slice(-6)})});
     const data = await res.json();
     thinking.remove();
-    addMsg(data.answer,'bot', `${routeBadge(data.route)}`);
+    const bubble = document.createElement('div');            // clean bubble: no route badge under it
+    bubble.className = 'msg bot';
+    bubble.innerHTML = renderAnswer(data.answer, data.sources);   // answer + clickable citations
+    messages.appendChild(bubble);
+    messages.scrollTop = messages.scrollHeight;
     renderDebug(data);
+    convo.push({role:'user', content:q});                   // remember this turn for follow-ups
+    convo.push({role:'assistant', content:data.answer});
   } catch(e){ thinking.textContent = 'Error: '+e; }
   send.disabled=false; input.focus();
 }
