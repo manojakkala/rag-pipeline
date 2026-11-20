@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG Assistant</title>
+<style>
+  :root { --bg:#0f1117; --panel:#171a23; --panel2:#1e222d; --line:#2a2f3c;
+          --text:#e6e8ee; --muted:#9aa3b2; --accent:#6ea8fe; --green:#4caf50; --red:#e5706b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text);
+         height:100vh; display:flex; flex-direction:column; }
+  header { padding:12px 18px; border-bottom:1px solid var(--line); font-weight:600; display:flex; gap:10px; align-items:center; }
+  header .dot { width:9px; height:9px; border-radius:50%; background:#4caf50; }
+  header small { color:var(--muted); font-weight:400; }
+  .main { flex:1; display:flex; min-height:0; }
+  /* chat */
+  .chat { flex:2; display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--line); }
+  .messages { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:14px; }
+  .msg { max-width:80%; padding:11px 14px; border-radius:12px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; }
+  .msg.user { align-self:flex-end; background:#273041; }
+  .msg.bot  { align-self:flex-start; background:var(--panel2); border:1px solid var(--line); }
+  .msg.bot .meta { margin-top:8px; font-size:12px; color:var(--muted); }
+  .inputbar { display:flex; gap:10px; padding:14px 18px; border-top:1px solid var(--line); }
+  .inputbar input { flex:1; padding:11px 14px; border-radius:10px; border:1px solid var(--line);
+                    background:var(--panel); color:var(--text); font-size:15px; }
+  .inputbar button { padding:0 18px; border-radius:10px; border:none; background:var(--accent); color:#06122b;
+                     font-weight:600; cursor:pointer; }
+  .inputbar button:disabled { opacity:.5; cursor:default; }
+  /* debug */
+  .debug { flex:1; min-width:300px; background:var(--panel); overflow-y:auto; padding:16px; font-size:13px; }
+  .debug h2 { margin:0 0 4px; font-size:14px; }
+  .debug .hint { color:var(--muted); font-size:12px; margin-bottom:14px; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:12px; font-weight:600; }
+  .b-rag{background:#1d3357;color:#9ec5ff} .b-api{background:#12402f;color:#7ee0b0}
+  .b-decline{background:#3a2a2a;color:#e5a0a0} .b-ok{background:#12402f;color:#7ee0b0} .b-no{background:#45211f;color:#f0a19c}
+  .row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); }
+  .stage { margin:10px 0; }
+  .stage .bar { height:7px; background:var(--accent); border-radius:4px; margin-top:4px; min-width:3px; }
+  .section-title { color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.5px; margin:16px 0 6px; }
+  .doc { display:flex; justify-content:space-between; gap:8px; padding:4px 0; color:var(--muted); font-family:ui-monospace,monospace; font-size:12px; }
+  .doc b { color:var(--text); font-weight:500; }
+  @media (max-width:760px){ .main{flex-direction:column} .chat{border-right:none;border-bottom:1px solid var(--line)} }
+</style>
+</head>
+<body>
+  <header><span class="dot"></span> RAG Assistant <small>GitHub docs + live API · with a live trace panel</small></header>
+  <div class="main">
+    <div class="chat">
+      <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Chat messages">
+        <div class="msg bot">Ask me a GitHub docs question (e.g. "how do I store secrets in Actions?"), a live one ("how many open issues does github/docs have?"), or something off-topic to see it decline.</div>
+      </div>
+      <div class="inputbar">
+        <input id="q" placeholder="Ask a question..." autocomplete="off" aria-label="Ask a question">
+        <button id="send">Send</button>
+      </div>
+    </div>
+    <div class="debug" id="debug">
+      <h2>Debug · observability</h2>
+      <div class="hint">The trace of the last question appears here — route, time per step, retrieved docs, and whether the answer was grounded.</div>
+    </div>
+  </div>
+
+<script>
+const messages = document.getElementById('messages');
+const input = document.getElementById('q');
+const send = document.getElementById('send');
+const debug = document.getElementById('debug');
+
+function addMsg(text, cls, metaHtml) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  if (metaHtml) { const m = document.createElement('div'); m.className = 'meta'; m.innerHTML = metaHtml; d.appendChild(m); }
+  messages.appendChild(d);
+  messages.scrollTop = messages.scrollHeight;
+  return d;
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function routeBadge(r){ const c={RAG:'b-rag',API:'b-api',CHAT:'b-rag',DECLINE:'b-decline',BLOCKED:'b-decline',error:'b-decline'}[r]||'b-rag'; return `<span class="badge ${c}">${esc(r)}</span>`; }
+
+function renderDebug(data){
+  const total = (data.spans||[]).reduce((s,x)=>s+x.ms,0);
+  const maxMs = Math.max(1, ...(data.spans||[]).map(x=>x.ms));
+  let html = `<h2>Debug · observability</h2>`;
+  html += `<div class="row"><span>route</span>${routeBadge(data.route)}</div>`;
+  if (data.grounded !== null && data.grounded !== undefined)
+    html += `<div class="row"><span>grounded</span><span class="badge ${data.grounded?'b-ok':'b-no'}">${data.grounded?'YES':'NO'}</span></div>`;
+  html += `<div class="row"><span>total time</span><b>${total} ms</b></div>`;
+
+  html += `<div class="section-title">time per step</div>`;
+  for (const s of (data.spans||[])) {
+    html += `<div class="stage"><div class="row" style="border:none;padding:2px 0"><span>${s.stage}</span><span>${s.ms} ms</span></div>
+             <div class="bar" style="width:${Math.round(100*s.ms/maxMs)}%"></div></div>`;
+    if (s.rewritten) html += `<div class="doc" style="margin:-4px 0 6px"><span>rewritten → ${esc(s.rewritten)}</span></div>`;
+    if (s.chunks) { for (const c of s.chunks) html += `<div class="doc"><b>${esc(c.doc)}</b><span>${esc(c.score)}</span></div>`; }
+  }
+  if (data.sources && data.sources.length) {
+    html += `<div class="section-title">sources</div>`;
+    for (const s of data.sources) html += `<div class="doc"><b>${esc(s)}</b></div>`;
+  }
+  debug.innerHTML = html;
+}
+
+async function ask(){
+  const q = input.value.trim();
+  if(!q) return;
+  input.value=''; send.disabled=true;
+  addMsg(q,'user');
+  const thinking = addMsg('thinking…','bot'); thinking.setAttribute('role','status');
+  try {
+    const res = await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    const data = await res.json();
+    thinking.remove();
+    addMsg(data.answer,'bot', `${routeBadge(data.route)}`);
+    renderDebug(data);
+  } catch(e){ thinking.textContent = 'Error: '+e; }
+  send.disabled=false; input.focus();
+}
+send.onclick = ask;
+input.addEventListener('keydown', e=>{ if(e.key==='Enter') ask(); });
+</script>
+</body>
+</html>

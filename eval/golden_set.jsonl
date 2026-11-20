@@ -1,0 +1,23 @@
+{"question": "What's the difference between GitHub's REST API and the GraphQL API?", "answer_doc_ids": ["about-the-rest-api__comparing-githubs-rest-api-and-graphql-api.md"]}
+{"question": "How do I choose which version of the REST API to use?", "answer_doc_ids": ["about-the-rest-api__api-versions.md"]}
+{"question": "What counts as a breaking change in the REST API?", "answer_doc_ids": ["about-the-rest-api__breaking-changes.md"]}
+{"question": "Where can I find the OpenAPI description of the REST API?", "answer_doc_ids": ["about-the-rest-api__about-the-openapi-description-for-the-rest-api.md"]}
+{"question": "How do I store and download build artifacts in GitHub Actions?", "answer_doc_ids": ["actions__artifacts.md"]}
+{"question": "How can I cache dependencies to speed up my Actions workflows?", "answer_doc_ids": ["actions__cache.md"]}
+{"question": "How do I use OpenID Connect to authenticate Actions to a cloud provider?", "answer_doc_ids": ["actions__oidc.md"]}
+{"question": "How do self-hosted runners work in GitHub Actions?", "answer_doc_ids": ["actions__self-hosted-runners.md"]}
+{"question": "How do I store secrets for use in GitHub Actions?", "answer_doc_ids": ["actions__secrets.md"]}
+{"question": "How do I stop two workflow runs from running at the same time?", "answer_doc_ids": ["actions__concurrency-groups.md"]}
+{"question": "How do notifications work on GitHub?", "answer_doc_ids": ["activity__notifications.md"]}
+{"question": "What does starring a repository do?", "answer_doc_ids": ["activity__starring.md"]}
+{"question": "How do I subscribe to a repository's activity?", "answer_doc_ids": ["activity__watching.md"]}
+{"question": "How do I define configuration variables for a workflow?", "answer_doc_ids": ["actions__variables.md"]}
+{"question": "What REST API endpoints are available for GitHub Apps?", "answer_doc_ids": ["apps__apps.md"]}
+{"question": "Can I run workflows on my own servers instead of GitHub-hosted machines?", "answer_doc_ids": ["actions__self-hosted-runners.md"]}
+{"question": "How do I keep passwords and tokens out of my workflow files?", "answer_doc_ids": ["actions__secrets.md"]}
+{"question": "How can I reuse installed dependencies across runs to make CI faster?", "answer_doc_ids": ["actions__cache.md"]}
+{"question": "How do I let a workflow access cloud resources without storing long-lived keys?", "answer_doc_ids": ["actions__oidc.md"]}
+{"question": "What is the X-GitHub-Api-Version header for?", "answer_doc_ids": ["about-the-rest-api__api-versions.md"]}
+{"question": "What is the difference between secrets and variables in GitHub Actions?", "answer_doc_ids": ["actions__secrets.md", "actions__variables.md"]}
+{"question": "How do I permanently delete my GitHub account?", "answer_doc_ids": []}
+{"question": "How much does GitHub Copilot cost per month?", "answer_doc_ids": []}

@@ -1,0 +1,13 @@
+# Keep the Docker build small and NEVER ship secrets or heavy local-only folders.
+.venv/
+venv/
+node_modules/
+data/
+.git/
+__pycache__/
+*.pyc
+.env
+.env.local
+traces.jsonl
+.cache/
+.claude/

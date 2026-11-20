@@ -1,0 +1,9 @@
+# Runtime dependencies for the RAG assistant (ingest + query + web app).
+psycopg[binary]==3.2.3   # talks to Postgres from Python
+python-dotenv==1.0.1     # loads DATABASE_URL / GROQ_API_KEY from .env.local (local dev)
+fastembed>=0.4,<1.0      # local ONNX embeddings (bge-small) + cross-encoder reranker — no API key, CPU
+pgvector>=0.3,<1.0       # pgvector type adapter, so Python vectors map to the vector column
+openai>=1.40,<2.0        # OpenAI SDK — also drives Groq (Groq is OpenAI-compatible)
+mcp>=1.2,<2.0            # Model Context Protocol SDK — exposes the assistant as a tool
+flask>=3.0,<4.0          # web backend for the chat UI
+gunicorn>=21,<24         # production WSGI server used in the Docker image (Hugging Face Spaces)

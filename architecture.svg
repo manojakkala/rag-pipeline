@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" font-family="Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="arow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#6ea8fe"/>
+    </marker>
+    <style>
+      .box{fill:#1e222d;stroke:#2a2f3c;stroke-width:1.5;rx:10;}
+      .t{fill:#e6e8ee;font-size:15px;font-weight:600;}
+      .s{fill:#9aa3b2;font-size:11px;}
+      .lbl{fill:#6ea8fe;font-size:13px;font-weight:700;letter-spacing:.5px;}
+      .ln{stroke:#6ea8fe;stroke-width:2;fill:none;marker-end:url(#arow);}
+      .flow{stroke:#6ea8fe;stroke-width:2;fill:none;marker-end:url(#arow);}
+    </style>
+  </defs>
+
+  <rect width="1120" height="640" fill="#0f1117"/>
+  <text x="40" y="44" fill="#e6e8ee" font-size="26" font-weight="700">🔎 RAG Assistant — Architecture</text>
+  <text x="40" y="68" class="s" font-size="13">Two pipelines, one store · docs RAG + live API + MCP · recall@10 90% · MRR 0.813</text>
+
+  <!-- INGEST PIPELINE -->
+  <text x="40" y="112" class="lbl">INGEST · offline</text>
+  <g>
+    <rect class="box" x="40" y="124" width="150" height="58" rx="10"/>
+    <text x="115" y="150" text-anchor="middle" class="t">Docs</text>
+    <text x="115" y="168" text-anchor="middle" class="s">GitHub docs corpus</text>
+
+    <rect class="box" x="228" y="124" width="150" height="58" rx="10"/>
+    <text x="303" y="150" text-anchor="middle" class="t">Load + Chunk</text>
+    <text x="303" y="168" text-anchor="middle" class="s">structure-aware</text>
+
+    <rect class="box" x="416" y="124" width="170" height="58" rx="10"/>
+    <text x="501" y="150" text-anchor="middle" class="t">Embed</text>
+    <text x="501" y="168" text-anchor="middle" class="s">bge-small · 384-d</text>
+
+    <line class="flow" x1="190" y1="153" x2="226" y2="153"/>
+    <line class="flow" x1="378" y1="153" x2="414" y2="153"/>
+  </g>
+
+  <!-- STORE -->
+  <rect class="box" x="40" y="236" width="1040" height="96" rx="12" fill="#171a23"/>
+  <text x="64" y="266" class="lbl">STORE · Neon Postgres + pgvector</text>
+  <rect class="box" x="64" y="280" width="300" height="38" rx="8"/>
+  <text x="214" y="304" text-anchor="middle" class="t" font-size="13">chunks: vector(384) + tsvector</text>
+  <rect class="box" x="384" y="280" width="260" height="38" rx="8"/>
+  <text x="514" y="304" text-anchor="middle" class="t" font-size="13">HNSW + GIN indexes</text>
+  <rect class="box" x="664" y="280" width="200" height="38" rx="8"/>
+  <text x="764" y="304" text-anchor="middle" class="t" font-size="13">qa_cache (semantic)</text>
+  <rect class="box" x="884" y="280" width="172" height="38" rx="8"/>
+  <text x="970" y="304" text-anchor="middle" class="t" font-size="13">metadata + ACL</text>
+
+  <!-- Embed -> Store -->
+  <line class="flow" x1="501" y1="182" x2="501" y2="234"/>
+
+  <!-- QUERY PIPELINE -->
+  <text x="40" y="382" class="lbl">QUERY · online (per request)</text>
+  <g>
+    <rect class="box" x="40" y="396" width="118" height="58" rx="10"/>
+    <text x="99" y="422" text-anchor="middle" class="t">User</text>
+    <text x="99" y="440" text-anchor="middle" class="s">question</text>
+
+    <rect class="box" x="172" y="396" width="118" height="58" rx="10"/>
+    <text x="231" y="422" text-anchor="middle" class="t">Flask UI</text>
+    <text x="231" y="440" text-anchor="middle" class="s">+ live trace</text>
+
+    <rect class="box" x="304" y="396" width="118" height="58" rx="10"/>
+    <text x="363" y="422" text-anchor="middle" class="t">Router</text>
+    <text x="363" y="440" text-anchor="middle" class="s">API / chat / decline</text>
+
+    <rect class="box" x="436" y="396" width="118" height="58" rx="10"/>
+    <text x="495" y="422" text-anchor="middle" class="t">Rewrite</text>
+    <text x="495" y="440" text-anchor="middle" class="s">cheap model</text>
+
+    <rect class="box" x="568" y="396" width="150" height="58" rx="10"/>
+    <text x="643" y="422" text-anchor="middle" class="t">Hybrid</text>
+    <text x="643" y="440" text-anchor="middle" class="s">vector+BM25+RRF</text>
+
+    <rect class="box" x="732" y="396" width="118" height="58" rx="10"/>
+    <text x="791" y="422" text-anchor="middle" class="t">Rerank</text>
+    <text x="791" y="440" text-anchor="middle" class="s">cross-encoder</text>
+
+    <rect class="box" x="864" y="396" width="118" height="58" rx="10"/>
+    <text x="923" y="422" text-anchor="middle" class="t">Groq LLM</text>
+    <text x="923" y="440" text-anchor="middle" class="s">gpt-oss-120b</text>
+
+    <rect class="box" x="996" y="396" width="90" height="58" rx="10" stroke="#4caf50"/>
+    <text x="1041" y="420" text-anchor="middle" class="t" font-size="13">Answer</text>
+    <text x="1041" y="438" text-anchor="middle" class="s">+cite</text>
+
+    <line class="flow" x1="158" y1="425" x2="170" y2="425"/>
+    <line class="flow" x1="290" y1="425" x2="302" y2="425"/>
+    <line class="flow" x1="422" y1="425" x2="434" y2="425"/>
+    <line class="flow" x1="554" y1="425" x2="566" y2="425"/>
+    <line class="flow" x1="718" y1="425" x2="730" y2="425"/>
+    <line class="flow" x1="850" y1="425" x2="862" y2="425"/>
+    <line class="flow" x1="982" y1="425" x2="994" y2="425"/>
+  </g>
+
+  <!-- Store -> Hybrid (retrieval reads the store) -->
+  <line class="flow" x1="643" y1="332" x2="643" y2="394"/>
+
+  <!-- BOTTOM: cross-cutting -->
+  <rect class="box" x="40" y="500" width="330" height="56" rx="10"/>
+  <text x="205" y="524" text-anchor="middle" class="t" font-size="13">Honesty</text>
+  <text x="205" y="542" text-anchor="middle" class="s">groundedness check · "I don't know"</text>
+
+  <rect class="box" x="396" y="500" width="300" height="56" rx="10"/>
+  <text x="546" y="524" text-anchor="middle" class="t" font-size="13">Security</text>
+  <text x="546" y="542" text-anchor="middle" class="s">ACL pre-filter · injection guard</text>
+
+  <rect class="box" x="722" y="500" width="358" height="56" rx="10"/>
+  <text x="901" y="524" text-anchor="middle" class="t" font-size="13">Observability &amp; Ops</text>
+  <text x="901" y="542" text-anchor="middle" class="s">tracing · dashboard · CI gate · blue-green · MCP server</text>
+
+  <text x="40" y="600" class="s" font-size="12">Python · Flask · Postgres/pgvector · fastembed (bge-small) · ms-marco cross-encoder · Groq · MCP · Docker · GitHub Actions</text>
+</svg>

@@ -1,0 +1,20 @@
+# Stage 7: runs the quality gate on every push / PR.
+# (Needs repo secrets DATABASE_URL and GROQ_API_KEY set in GitHub settings.)
+name: rag-quality-gate
+
+on: [push, pull_request]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Quality gate (recall@10)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python eval/gate.py   # exits non-zero if recall@10 drops -> build fails

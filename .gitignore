@@ -1,0 +1,24 @@
+# Secrets — never commit
+.env
+
+# Downloaded corpus (we can always re-fetch it)
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.neon
+node_modules/
+.env.local
+
+# Runtime output / caches (not source)
+traces.jsonl
+.cache/
+*.onnx
+.DS_Store
+
+# Markdown docs — keep local. README.md is kept (GitHub front page + required by HF Spaces).
+*.md
+!README.md
