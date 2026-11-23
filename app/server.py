@@ -67,6 +67,9 @@ def traced_ask(question: str, history=None) -> dict:
     if history:
         t = time.time(); q = contextualize.contextualize(history, question)
         span("contextualize", t, standalone=q)
+        if guardrails.looks_like_injection(q):           # re-check the history-derived question (defense-in-depth)
+            return {"answer": "That looks like a prompt-injection attempt, so I won't act on it.",
+                    "route": "BLOCKED", "grounded": None, "sources": [], "spans": spans}
 
     t = time.time(); decision = router.route(q); span("route", t, decision=decision)
 
