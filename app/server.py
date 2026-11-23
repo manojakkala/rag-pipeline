@@ -130,7 +130,8 @@ def index():
 
 
 @app.route("/ask", methods=["POST"])
-@limiter.limit("15 per minute; 150 per hour")               # per-IP cap; friendly 429 handled above
+@limiter.limit("15 per minute; 150 per hour")               # per-IP fairness; friendly 429 handled above
+@limiter.limit("40 per minute; 400 per hour", key_func=lambda: "global")  # GLOBAL cap → protects the Groq quota
 def ask():
     payload = request.get_json(silent=True) or {}
     q = (payload.get("question") or "").strip()
