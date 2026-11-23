@@ -46,9 +46,11 @@ def fetch_repo(owner_repo: str):
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", owner_repo):      # only owner/repo — no path tricks
         return None, "invalid repository name"
     url = f"https://api.github.com/repos/{owner_repo}"
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "rag-assistant", "Accept": "application/vnd.github+json"}
-    )
+    headers = {"User-Agent": "rag-assistant", "Accept": "application/vnd.github+json"}
+    token = os.environ.get("GITHUB_TOKEN")               # optional: lifts the 60/hr limit to 5000/hr
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             d = json.load(r)

@@ -148,12 +148,15 @@ def cached_answer(question: str, k: int = 5) -> str:
 
     full = answer(question, k)                           # MISS → run the full pipeline
     stored = re.sub(r"\n\[total [^\n]*\]", "", full)     # drop the per-answer timing before caching
-    with DB.connection() as conn:                        # ...then store it for next time
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO qa_cache (question, q_embedding, answer) VALUES (%s, %s, %s)",
-                (question, qvec, stored),
-            )
+    try:                                                 # caching is best-effort — never lose the answer over it
+        with DB.connection() as conn:                    # ...then store it for next time
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO qa_cache (question, q_embedding, answer) VALUES (%s, %s, %s)",
+                    (question, qvec, stored),
+                )
+    except Exception as e:
+        print("cache store failed:", repr(e), file=sys.stderr)
     return f"[CACHE MISS - computed and stored  {time.time() - t0:.2f}s]\n\n{full}"
 
 

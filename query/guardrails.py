@@ -14,9 +14,11 @@ PATTERNS = [
     r"forget (everything|your instructions|the above)",
     r"system prompt",
     r"reveal (all |the )?(secrets|passwords|api keys|your prompt|system prompt)",
-    r"you are now",
-    r"\bact as\b",
-    r"print .*(secret|password|key)",
+    # Narrowed so legitimate docs questions (e.g. "act as a GitHub App") aren't flagged;
+    # we only match the role-play jailbreak phrasings.
+    r"you are now (a |an )?(dan|developer mode|unrestricted|jailbroken|free|no longer)",
+    r"act as (a |an )?(dan|jailbreak|unrestricted|admin|system|developer mode)",
+    r"print .*(secret|password|api key)",
 ]
 _RX = re.compile("|".join(PATTERNS), re.IGNORECASE)
 

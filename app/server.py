@@ -14,6 +14,9 @@ os.chdir(ROOT)                                  # so .env.local / data resolve
 sys.path.insert(0, os.path.join(ROOT, "query"))
 
 from flask import Flask, request, jsonify, send_file
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 load_dotenv(".env.local")
@@ -28,6 +31,18 @@ import contextualize
 from sources import source_url
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # trust Render's proxy → real client IP
+
+# Rate limit the public endpoint so a traffic spike can't drain the Groq quota.
+# In-memory storage is fine here because we run a single gunicorn worker.
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
+
+
+@app.errorhandler(429)
+def _rate_limited(e):
+    return jsonify({"answer": "You're sending requests too quickly — please wait a moment and try again.",
+                    "route": "rate-limited", "grounded": None, "sources": [], "spans": []}), 429
+
 
 # On tiny hosts (e.g. a 512MB free tier) loading BOTH models can run out of memory.
 # LITE_RETRIEVAL=1 skips the cross-encoder reranker: we still do hybrid (vector+BM25) search,
@@ -115,6 +130,7 @@ def index():
 
 
 @app.route("/ask", methods=["POST"])
+@limiter.limit("15 per minute; 150 per hour")               # per-IP cap; friendly 429 handled above
 def ask():
     payload = request.get_json(silent=True) or {}
     q = (payload.get("question") or "").strip()
