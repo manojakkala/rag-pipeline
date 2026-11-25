@@ -91,13 +91,14 @@ def _get_reranker():
     return _reranker
 
 
-def retrieve_rerank(question: str, k: int = 5, pool: int = 50, cand: int = 30):
+def retrieve_rerank(question: str, k: int = 5, pool: int = 50, cand: int = 30, return_candidates: bool = False):
     """Wide net via hybrid search, then a cross-encoder re-reads the top `cand`
-    candidates (question + chunk together) and keeps the best k."""
+    candidates (question + chunk together) and keeps the best k.
+    With return_candidates=True, also returns the pre-rerank fused list (for tracing the funnel)."""
     fused = retrieve_hybrid(question, k=cand, pool=pool)   # [(chunk_id, doc_id, score), ...]
     cids = [cid for cid, _, _ in fused]
     if not cids:
-        return []
+        return ([], []) if return_candidates else []
     with DB.connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT chunk_id, doc_id, text FROM chunks WHERE chunk_id = ANY(%s)", (cids,))
@@ -105,7 +106,8 @@ def retrieve_rerank(question: str, k: int = 5, pool: int = 50, cand: int = 30):
     cands = [(cid, rows[cid][0], rows[cid][1]) for cid in cids if cid in rows]
     scores = list(_get_reranker().rerank(question, [text for _, _, text in cands]))
     order = sorted(zip(cands, scores), key=lambda x: x[1], reverse=True)[:k]
-    return [(cid, did, float(score), text) for (cid, did, text), score in order]
+    result = [(cid, did, float(score), text) for (cid, did, text), score in order]
+    return (result, fused) if return_candidates else result
 
 
 def retrieve_hybrid_text(question: str, k: int = 5, pool: int = 50):
