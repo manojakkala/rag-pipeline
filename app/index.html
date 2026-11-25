@@ -4,148 +4,385 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RAG Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0f1117; --panel:#171a23; --panel2:#1e222d; --line:#2a2f3c;
-          --text:#e6e8ee; --muted:#9aa3b2; --accent:#6ea8fe; --green:#4caf50; --red:#e5706b; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text);
-         height:100vh; display:flex; flex-direction:column; }
-  header { padding:12px 18px; border-bottom:1px solid var(--line); font-weight:600; display:flex; gap:10px; align-items:center; }
-  header .dot { width:9px; height:9px; border-radius:50%; background:#4caf50; }
-  header small { color:var(--muted); font-weight:400; }
-  .main { flex:1; display:flex; min-height:0; }
-  /* chat */
-  .chat { flex:2; display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--line); }
-  .messages { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:14px; }
-  .msg { max-width:80%; padding:11px 14px; border-radius:12px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; }
-  .msg.user { align-self:flex-end; background:#273041; }
-  .msg.bot  { align-self:flex-start; background:var(--panel2); border:1px solid var(--line); }
-  .msg.bot .meta { margin-top:8px; font-size:12px; color:var(--muted); }
-  .inputbar { display:flex; gap:10px; padding:14px 18px; border-top:1px solid var(--line); }
-  .inputbar input { flex:1; padding:11px 14px; border-radius:10px; border:1px solid var(--line);
-                    background:var(--panel); color:var(--text); font-size:15px; }
-  .inputbar button { padding:0 18px; border-radius:10px; border:none; background:var(--accent); color:#06122b;
-                     font-weight:600; cursor:pointer; }
-  .inputbar button:disabled { opacity:.5; cursor:default; }
-  /* debug */
-  .debug { flex:1; min-width:300px; background:var(--panel); overflow-y:auto; padding:16px; font-size:13px; }
-  .debug h2 { margin:0 0 4px; font-size:14px; }
-  .debug .hint { color:var(--muted); font-size:12px; margin-bottom:14px; }
-  .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:12px; font-weight:600; }
-  .b-rag{background:#1d3357;color:#9ec5ff} .b-api{background:#12402f;color:#7ee0b0}
-  .b-decline{background:#3a2a2a;color:#e5a0a0} .b-ok{background:#12402f;color:#7ee0b0} .b-no{background:#45211f;color:#f0a19c}
-  .row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); }
-  .stage { margin:10px 0; }
-  .stage .bar { height:7px; background:var(--accent); border-radius:4px; margin-top:4px; min-width:3px; }
-  .section-title { color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.5px; margin:16px 0 6px; }
-  .doc { display:flex; justify-content:space-between; gap:8px; padding:4px 0; color:var(--muted); font-family:ui-monospace,monospace; font-size:12px; }
-  .doc b { color:var(--text); font-weight:500; }
-  .cite { color:var(--accent); text-decoration:none; font-weight:600; }
-  .cite:hover { text-decoration:underline; }
-  .debug a { color:var(--accent); text-decoration:none; }
-  .debug a:hover { text-decoration:underline; }
-  @media (max-width:760px){ .main{flex-direction:column} .chat{border-right:none;border-bottom:1px solid var(--line)} }
+  :root{
+    /* base — white, layered light surfaces */
+    --ink:#ffffff; --surface:#f6f8fc; --surface-2:#eef2f9; --elev:#e7edf6;
+    --line:#e1e7f0; --line-soft:#eef2f8;
+    --text:#111621; --muted:#5b6678; --faint:#97a0b1;
+    /* one confident primary */
+    --primary:#3b74f0; --primary-ink:#ffffff;
+    /* semantic route + status colors (these ENCODE meaning, not decorate) — darkened for light bg */
+    --rag:#2f6bdf;    --rag-bg:rgba(59,116,240,.12);
+    --api:#0e9e74;    --api-bg:rgba(14,158,116,.13);
+    --chat:#7a46e6;   --chat-bg:rgba(122,70,230,.12);
+    --decline:#c17d12;--decline-bg:rgba(193,125,18,.13);
+    --ok:#0e9e74;     --bad:#e5484d;
+    --font-display:'Space Grotesk',system-ui,sans-serif;
+    --font-ui:system-ui,'Segoe UI',Roboto,sans-serif;
+    --font-mono:ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+    --radius:14px; --radius-sm:10px;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:var(--font-ui);background:var(--ink);color:var(--text);
+       display:flex;flex-direction:column;overflow:hidden;
+       -webkit-font-smoothing:antialiased;}
+  body::before{ /* faint top glow — one subtle flourish, not per-card */
+    content:"";position:fixed;inset:0 0 auto 0;height:260px;pointer-events:none;
+    background:radial-gradient(90% 100% at 70% -40%,rgba(59,116,240,.07),transparent 70%);}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:12px;padding:14px 22px;
+         border-bottom:1px solid var(--line);background:rgba(255,255,255,.72);
+         backdrop-filter:blur(8px);position:relative;z-index:2;}
+  .mark{display:flex;align-items:center;gap:11px;}
+  .glyph{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+         background:linear-gradient(145deg,#eaf1ff,#d7e4ff);border:1px solid #c6d8fb;
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.7);}
+  .glyph span{width:9px;height:9px;border-radius:50%;background:var(--primary);
+              box-shadow:0 0 12px var(--primary);}
+  .wordmark{font-family:var(--font-display);font-weight:700;font-size:17px;letter-spacing:.2px;}
+  .tagline{color:var(--muted);font-size:13px;margin-left:2px;}
+  .status{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--muted);
+          font-size:12.5px;font-family:var(--font-mono);}
+  .status .live{width:7px;height:7px;border-radius:50%;background:var(--ok);
+                box-shadow:0 0 8px var(--ok);animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .main{flex:1;display:flex;min-height:0;position:relative;z-index:1;}
+
+  /* ---------- chat ---------- */
+  .chat{flex:1.7;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line);}
+  .messages{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:16px;}
+  .msg{max-width:78%;padding:13px 16px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word;
+       font-size:15px;animation:rise .28s ease both;box-shadow:var(--shadow);}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg.user{align-self:flex-end;background:var(--primary);color:var(--primary-ink);font-weight:500;
+            border-radius:16px 16px 4px 16px;}
+  .msg.bot{align-self:flex-start;background:var(--surface-2);border:1px solid var(--line);
+           border-radius:16px 16px 16px 4px;}
+  .msg.bot a.cite{color:var(--primary);text-decoration:none;font-weight:600;
+                  padding:0 3px;border-radius:4px;background:var(--rag-bg);}
+  .msg.bot a.cite:hover{text-decoration:underline;}
+
+  /* thinking dots */
+  .think{display:inline-flex;gap:5px;align-items:center;}
+  .think i{width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;
+           animation:blink 1.2s infinite ease-in-out;}
+  .think i:nth-child(2){animation-delay:.18s}.think i:nth-child(3){animation-delay:.36s}
+  @keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+  /* ---------- empty state (the hero) ---------- */
+  .intro{margin:auto;max-width:460px;text-align:center;padding:24px 8px;animation:rise .4s ease both;}
+  .intro h1{font-family:var(--font-display);font-weight:600;font-size:26px;line-height:1.25;margin:0 0 10px;}
+  .intro p{color:var(--muted);font-size:15px;line-height:1.6;margin:0 0 22px;}
+  .chips{display:flex;flex-direction:column;gap:10px;text-align:left;}
+  .chip{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;
+        background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+        color:var(--text);font-size:14px;font-family:inherit;text-align:left;box-shadow:var(--shadow);
+        transition:border-color .15s,background .15s,transform .15s;}
+  .chip:hover{border-color:var(--primary);background:var(--surface-2);transform:translateX(2px);}
+  .chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+  .chip .tag{flex:none;font-family:var(--font-mono);font-size:10.5px;font-weight:600;
+             padding:3px 8px;border-radius:20px;letter-spacing:.3px;}
+  .tag.docs{color:var(--rag);background:var(--rag-bg);}
+  .tag.live{color:var(--api);background:var(--api-bg);}
+  .tag.off{color:var(--decline);background:var(--decline-bg);}
+
+  /* ---------- input ---------- */
+  .inputbar{display:flex;gap:10px;padding:16px 22px;border-top:1px solid var(--line);
+            background:var(--ink);}
+  .field{flex:1;display:flex;align-items:center;background:var(--surface);
+         border:1px solid var(--line);border-radius:var(--radius);padding:0 6px 0 16px;
+         transition:border-color .15s,box-shadow .15s;}
+  .field:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--rag-bg);}
+  .field input{flex:1;background:none;border:none;outline:none;color:var(--text);
+               font-family:inherit;font-size:15px;padding:13px 0;}
+  .field input::placeholder{color:var(--faint);}
+  .send{display:flex;align-items:center;gap:7px;padding:0 18px;height:46px;border:none;
+        border-radius:var(--radius);background:var(--primary);color:var(--primary-ink);
+        font-family:inherit;font-weight:600;font-size:14.5px;cursor:pointer;
+        transition:filter .15s,transform .05s;}
+  .send:hover{filter:brightness(1.08);}
+  .send:active{transform:translateY(1px);}
+  .send:disabled{opacity:.45;cursor:default;}
+  .send svg{width:16px;height:16px;}
+
+  /* ---------- trace panel (the instrument) ---------- */
+  .trace{flex:1;min-width:320px;max-width:440px;background:var(--surface);overflow-y:auto;padding:20px;}
+  .trace-head{display:flex;align-items:baseline;gap:8px;margin-bottom:3px;}
+  .trace-head h2{font-family:var(--font-display);font-weight:600;font-size:15px;margin:0;}
+  .trace-head .tick{color:var(--primary);}
+  .trace .hint{color:var(--muted);font-size:12.5px;line-height:1.5;margin-bottom:18px;}
+  .trace .waiting{color:var(--faint);font-family:var(--font-mono);font-size:12px;
+                  border:1px dashed var(--line);border-radius:var(--radius-sm);padding:16px;text-align:center;}
+
+  .summary{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);
+         font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:8px;letter-spacing:.3px;}
+  .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .b-rag{color:var(--rag);background:var(--rag-bg);} .b-api{color:var(--api);background:var(--api-bg);}
+  .b-chat{color:var(--chat);background:var(--chat-bg);} .b-decline{color:var(--decline);background:var(--decline-bg);}
+  .b-ok{color:var(--ok);background:var(--api-bg);} .b-bad{color:var(--bad);background:rgba(255,122,133,.14);}
+  .b-time{color:var(--muted);background:var(--surface-2);}
+
+  .caption{color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.4px;
+           margin:20px 0 10px;display:flex;align-items:center;gap:8px;}
+  .caption::after{content:"";flex:1;height:1px;background:var(--line-soft);}
+
+  /* pipeline timeline */
+  .pipe{position:relative;padding-left:20px;}
+  .pipe::before{content:"";position:absolute;left:4px;top:4px;bottom:8px;width:2px;background:var(--line);}
+  .step{position:relative;margin-bottom:14px;}
+  .step::before{content:"";position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;
+                background:var(--surface);border:2px solid var(--primary);}
+  .step-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;}
+  .step-top .name{font-weight:500;}
+  .step-top .ms{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);}
+  .bar{height:5px;border-radius:3px;margin-top:6px;min-width:3px;
+       background:linear-gradient(90deg,var(--primary),#8db0ff);}
+  .note{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);margin-top:6px;
+        background:var(--ink);border:1px solid var(--line-soft);border-radius:7px;padding:7px 9px;
+        word-break:break-word;}
+  .note b{color:var(--text);font-weight:600;}
+
+  .doc{display:flex;align-items:center;gap:10px;padding:6px 0;}
+  .doc .id{font-family:var(--font-mono);font-size:11.5px;color:var(--text);flex:1;
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .doc .id a{color:inherit;text-decoration:none;}.doc .id a:hover{color:var(--primary);}
+  .doc .score{font-family:var(--font-mono);font-size:11px;color:var(--muted);flex:none;}
+  .doc .track{flex:none;width:52px;height:4px;border-radius:2px;background:var(--line);overflow:hidden;}
+  .doc .track i{display:block;height:100%;background:var(--api);}
+  /* deeper-trace detail */
+  .snip{font-size:11px;color:var(--muted);margin:1px 0 9px 2px;line-height:1.45;
+        border-left:2px solid var(--line);padding-left:8px;}
+  details.more{margin:7px 0;}
+  details.more > summary{cursor:pointer;color:var(--primary);font-size:11.5px;font-weight:600;
+                         list-style:none;user-select:none;padding:2px 0;}
+  details.more > summary::-webkit-details-marker{display:none;}
+  details.more > summary::before{content:"\25B8  ";}
+  details.more[open] > summary::before{content:"\25BE  ";}
+  pre.ctx{white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:10.5px;
+          color:var(--muted);background:var(--ink);border:1px solid var(--line-soft);border-radius:7px;
+          padding:9px;max-height:240px;overflow:auto;margin:6px 0 2px;}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:820px){
+    .main{flex-direction:column;}
+    .chat{border-right:none;border-bottom:1px solid var(--line);}
+    .trace{max-width:none;min-width:0;}
+    .msg{max-width:88%;}
+    .tagline{display:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;}
+  }
 </style>
 </head>
 <body>
-  <header><span class="dot"></span> RAG Assistant <small>GitHub docs + live API · with a live trace panel</small></header>
+  <header>
+    <div class="mark">
+      <div class="glyph"><span></span></div>
+      <div>
+        <span class="wordmark">RAG Assistant</span>
+        <span class="tagline">GitHub docs, answered in the open</span>
+      </div>
+    </div>
+    <div class="status"><span class="live"></span> live</div>
+  </header>
+
   <div class="main">
     <div class="chat">
       <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Chat messages">
-        <div class="msg bot">Ask me a GitHub docs question (e.g. "how do I store secrets in Actions?"), a live one ("how many open issues does github/docs have?"), or something off-topic to see it decline.</div>
+        <div class="intro" id="intro">
+          <h1>Ask about GitHub — and watch it work.</h1>
+          <p>Answers come straight from GitHub's documentation, with live repository data when a question needs it. Every step shows up in the trace on the right.</p>
+          <div class="chips">
+            <button class="chip" data-q="How do I store secrets in GitHub Actions?">
+              <span class="tag docs">docs</span> How do I store secrets in GitHub Actions?
+            </button>
+            <button class="chip" data-q="How many open issues does facebook/react have?">
+              <span class="tag live">live</span> How many open issues does facebook/react have?
+            </button>
+            <button class="chip" data-q="What's the weather today?">
+              <span class="tag off">off-topic</span> What's the weather today?
+            </button>
+          </div>
+        </div>
       </div>
       <div class="inputbar">
-        <input id="q" placeholder="Ask a question..." autocomplete="off" aria-label="Ask a question">
-        <button id="send">Send</button>
+        <div class="field">
+          <input id="q" placeholder="Ask a GitHub question…" autocomplete="off" aria-label="Ask a question">
+        </div>
+        <button class="send" id="send" aria-label="Send">
+          Send
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
       </div>
     </div>
-    <div class="debug" id="debug">
-      <h2>Debug · observability</h2>
-      <div class="hint">The trace of the last question appears here — route, time per step, retrieved docs, and whether the answer was grounded.</div>
-    </div>
+
+    <aside class="trace" id="trace">
+      <div class="trace-head"><span class="tick">▍</span><h2>Trace</h2></div>
+      <div class="hint">Every answer is routed, retrieved, and fact-checked. The steps, timings, and sources show up here.</div>
+      <div class="waiting" id="waiting">waiting for your first question…</div>
+    </aside>
   </div>
 
 <script>
 const messages = document.getElementById('messages');
 const input = document.getElementById('q');
-const send = document.getElementById('send');
-const debug = document.getElementById('debug');
+const send  = document.getElementById('send');
+const trace = document.getElementById('trace');
+const intro = document.getElementById('intro');
 const convo = [];   // conversation history → lets follow-up questions work
 
-function addMsg(text, cls, metaHtml) {
+function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function addMsg(text, cls){
   const d = document.createElement('div');
   d.className = 'msg ' + cls;
   d.textContent = text;
-  if (metaHtml) { const m = document.createElement('div'); m.className = 'meta'; m.innerHTML = metaHtml; d.appendChild(m); }
   messages.appendChild(d);
   messages.scrollTop = messages.scrollHeight;
   return d;
 }
 
-function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function renderAnswer(text, sources){
-  let html = esc(text);                                   // escape untrusted model output FIRST
-  html = html.replace(/\[(\d+)\]/g, (m, n) => {           // then turn [1],[2]... into clickable links
+  let html = esc(text);                                     // escape untrusted model output FIRST
+  html = html.replace(/\[(\d+)\]/g, (m, n) => {             // then turn [1],[2]… into clickable links
     const s = sources && sources[Number(n)-1];
     return (s && s.url) ? `<a class="cite" href="${esc(s.url)}" target="_blank" rel="noopener">[${n}]</a>` : m;
   });
   return html;
 }
-function routeBadge(r){ const c={RAG:'b-rag',API:'b-api',CHAT:'b-rag',DECLINE:'b-decline',BLOCKED:'b-decline',error:'b-decline'}[r]||'b-rag'; return `<span class="badge ${c}">${esc(r)}</span>`; }
 
-function renderDebug(data){
-  const total = (data.spans||[]).reduce((s,x)=>s+x.ms,0);
-  const maxMs = Math.max(1, ...(data.spans||[]).map(x=>x.ms));
-  let html = `<h2>Debug · observability</h2>`;
-  html += `<div class="row"><span>route</span>${routeBadge(data.route)}</div>`;
+const ROUTE_CLASS = {RAG:'b-rag',API:'b-api',CHAT:'b-chat',DECLINE:'b-decline',BLOCKED:'b-decline',error:'b-decline'};
+function routeBadge(r){ return `<span class="badge ${ROUTE_CLASS[r]||'b-rag'}">${esc(r)}</span>`; }
+
+function renderTrace(data){
+  const spans = data.spans || [];
+  const total = spans.reduce((s,x)=>s+x.ms,0);
+  const maxMs = Math.max(1, ...spans.map(x=>x.ms));
+  let html = `<div class="trace-head"><span class="tick">▍</span><h2>Trace</h2></div>`;
+
+  html += `<div class="summary">${routeBadge(data.route)}`;
   if (data.grounded !== null && data.grounded !== undefined)
-    html += `<div class="row"><span>grounded</span><span class="badge ${data.grounded?'b-ok':'b-no'}">${data.grounded?'YES':'NO'}</span></div>`;
-  html += `<div class="row"><span>total time</span><b>${total} ms</b></div>`;
+    html += `<span class="badge ${data.grounded?'b-ok':'b-bad'}">${data.grounded?'grounded':'ungrounded'}</span>`;
+  html += `<span class="badge b-time">${total} ms</span></div>`;
 
-  html += `<div class="section-title">time per step</div>`;
-  for (const s of (data.spans||[])) {
-    html += `<div class="stage"><div class="row" style="border:none;padding:2px 0"><span>${s.stage}</span><span>${s.ms} ms</span></div>
-             <div class="bar" style="width:${Math.round(100*s.ms/maxMs)}%"></div></div>`;
-    if (s.rewritten) html += `<div class="doc" style="margin:-4px 0 6px"><span>rewritten → ${esc(s.rewritten)}</span></div>`;
-    if (s.standalone) html += `<div class="doc" style="margin:-4px 0 6px"><span>standalone → ${esc(s.standalone)}</span></div>`;
-    if (s.chunks) { for (const c of s.chunks) html += `<div class="doc"><b>${esc(c.doc)}</b><span>${esc(c.score)}</span></div>`; }
+  if (spans.length){
+    html += `<div class="caption">pipeline</div><div class="pipe">`;
+    for (const s of spans){
+      html += `<div class="step"><div class="step-top"><span class="name">${esc(s.stage)}</span><span class="ms">${s.ms} ms</span></div>
+               <div class="bar" style="width:${Math.max(4,Math.round(100*s.ms/maxMs))}%"></div>`;
+      if (s.rewritten)  html += `<div class="note">rewritten → <b>${esc(s.rewritten)}</b></div>`;
+      if (s.standalone) html += `<div class="note">standalone → <b>${esc(s.standalone)}</b></div>`;
+      if (s.verdict)    html += `<div class="note">groundedness → <b>${esc(s.verdict)}</b></div>`;
+      if (s.chunks && s.chunks.length){
+        const top = Math.max(...s.chunks.map(c=>Math.abs(Number(c.score))||0),1);
+        for (const c of s.chunks){
+          const pct = Math.round(100*(Math.abs(Number(c.score))||0)/top);
+          html += `<div class="doc"><span class="id">${esc(c.doc)}</span>
+                   <span class="track"><i style="width:${pct}%"></i></span>
+                   <span class="score">${esc(c.score)}</span></div>`;
+          if (c.text) html += `<div class="snip">${esc(c.text)}…</div>`;   // what the model actually read
+        }
+      }
+      if (s.candidates && s.candidates.length){                            // the pre-rerank funnel
+        html += `<details class="more"><summary>candidate pool before rerank (${s.candidates.length})</summary>`;
+        for (const c of s.candidates)
+          html += `<div class="doc"><span class="id">${esc(c.doc)}</span><span class="score">${esc(c.score)}</span></div>`;
+        html += `</details>`;
+      }
+      if (s.context)                                                       // exact context given to the model
+        html += `<details class="more"><summary>context sent to the model (${s.context.length} chars)</summary><pre class="ctx">${esc(s.context)}</pre></details>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
   }
-  if (data.sources && data.sources.length) {
-    html += `<div class="section-title">sources</div>`;
-    for (const s of data.sources) {
+
+  if (data.sources && data.sources.length){
+    html += `<div class="caption">sources</div>`;
+    for (const s of data.sources){
       const id = esc(s && s.id ? s.id : s);
       html += (s && s.url)
-        ? `<div class="doc"><a href="${esc(s.url)}" target="_blank" rel="noopener"><b>${id}</b></a></div>`
-        : `<div class="doc"><b>${id}</b></div>`;
+        ? `<div class="doc"><span class="id"><a href="${esc(s.url)}" target="_blank" rel="noopener">${id}</a></span></div>`
+        : `<div class="doc"><span class="id">${id}</span></div>`;
     }
   }
-  debug.innerHTML = html;
+  trace.innerHTML = html;
 }
 
-async function ask(){
-  const q = input.value.trim();
+async function ask(q){
+  q = (q !== undefined ? q : input.value).trim();
   if(!q) return;
+  if (intro) intro.remove();
   input.value=''; send.disabled=true;
   addMsg(q,'user');
-  const thinking = addMsg('thinking…','bot'); thinking.setAttribute('role','status');
-  try {
-    const res = await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},
+
+  const bubble = document.createElement('div');          // one bubble we fill as tokens arrive
+  bubble.className = 'msg bot';
+  bubble.setAttribute('role','status');
+  bubble.innerHTML = `<span class="think"><i></i><i></i><i></i></span>`;   // dots until first token
+  messages.appendChild(bubble);
+  messages.scrollTop = messages.scrollHeight;
+
+  let answer = '', sources = [], started = false;
+  try{
+    const res = await fetch('/ask_stream',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q, history: convo.slice(-6)})});
-    const data = await res.json();
-    thinking.remove();
-    const bubble = document.createElement('div');            // clean bubble: no route badge under it
-    bubble.className = 'msg bot';
-    bubble.innerHTML = renderAnswer(data.answer, data.sources);   // answer + clickable citations
-    messages.appendChild(bubble);
-    messages.scrollTop = messages.scrollHeight;
-    renderDebug(data);
-    convo.push({role:'user', content:q});                   // remember this turn for follow-ups
-    convo.push({role:'assistant', content:data.answer});
-  } catch(e){ thinking.textContent = 'Error: '+e; }
+    if(!res.ok){                                            // e.g. 429 rate-limit → show its JSON message, not a blank bubble
+      let msg = 'Something went wrong. Please try again.';
+      try { const j = await res.json(); if(j && j.answer) msg = j.answer; } catch(_){}
+      bubble.textContent = msg;
+      send.disabled=false; input.focus();
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while(true){
+      const {value, done} = await reader.read();
+      if(done) break;
+      buf += decoder.decode(value, {stream:true});
+      let i;
+      while((i = buf.indexOf('\n\n')) >= 0){                // SSE events are separated by a blank line
+        const line = buf.slice(0, i); buf = buf.slice(i + 2);
+        if(!line.startsWith('data:')) continue;
+        let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch(_) { continue; }
+        if(ev.type === 'meta'){
+          sources = ev.sources || [];                      // arrives before tokens → citations can link
+        } else if(ev.type === 'token'){
+          if(!started){ bubble.innerHTML = ''; started = true; }   // clear the dots on first token
+          answer += ev.text;
+          bubble.innerHTML = renderAnswer(answer, sources);
+          messages.scrollTop = messages.scrollHeight;
+        } else if(ev.type === 'done'){
+          sources = ev.sources || sources;
+          bubble.innerHTML = renderAnswer(answer, sources);
+          renderTrace({route:ev.route, grounded:ev.grounded, sources:sources, spans:ev.spans||[]});
+          convo.push({role:'user', content:q});
+          convo.push({role:'assistant', content:answer});
+        }
+      }
+    }
+    if(!started && !answer){ bubble.textContent = '(no response)'; }
+  }catch(e){
+    bubble.textContent = 'Something went wrong reaching the server. Try again.';
+  }
   send.disabled=false; input.focus();
 }
-send.onclick = ask;
+
+send.onclick = () => ask();
 input.addEventListener('keydown', e=>{ if(e.key==='Enter') ask(); });
+document.querySelectorAll('.chip').forEach(c=>{
+  c.addEventListener('click', ()=> ask(c.dataset.q));
+});
 </script>
 </body>
 </html>
